@@ -1,8 +1,13 @@
+//amplify/storage/resource.ts
 import { defineBackend } from '@aws-amplify/backend';
 import { auth } from './auth/resource';
 import { data } from './data/resource';
+import { storage } from './storage/resource';
 
-defineBackend({
+const backend = defineBackend({
   auth,
   data,
+  storage
 });
+
+export default backend;
