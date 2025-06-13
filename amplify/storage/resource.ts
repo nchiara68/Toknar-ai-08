@@ -1,14 +1,14 @@
-//amplify/storage/resource.ts
 import { defineStorage } from '@aws-amplify/backend';
 
+// 📁 STAGE 3: S3 Storage Configuration - Simple approach
 export const storage = defineStorage({
-  name: 'ragChatStage1Storage',
+  name: 'ragChatDocuments',
   access: (allow) => ({
-    'documents/{identity_id}/*': [
-      allow.authenticated.to(['write', 'read', 'delete']),
-    ],
-    'temp/{identity_id}/*': [
-      allow.authenticated.to(['write', 'read', 'delete']),
+    // 👤 Allow authenticated users to upload anywhere in documents folder
+    'documents/*': [
+      allow.authenticated.to(['read', 'write', 'delete'])
     ]
   })
 });
+
+console.log('📁 Stage 3: S3 storage configured with simple documents access');

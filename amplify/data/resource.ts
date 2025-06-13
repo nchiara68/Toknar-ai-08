@@ -1,8 +1,8 @@
 import { defineData, a, type ClientSchema } from '@aws-amplify/backend';
 
-// 📊 STAGE 2: Data Schema with AI Conversation
+// 📊 STAGE 3: Data Schema with AI Conversation + Storage
 const schema = a.schema({
-  // 🤖 AI CONVERSATION - This is the key addition for Stage 2
+  // 🤖 AI CONVERSATION (from Stage 2)
   ragChat: a.conversation({
     aiModel: a.ai.model('Claude 3 Haiku'),
     systemPrompt: `You are a helpful AI assistant. 
@@ -11,10 +11,11 @@ INSTRUCTIONS:
 - Be friendly and conversational
 - Give clear, helpful responses
 - Keep responses concise but informative
-- For now, you don't have access to any documents
-- If asked about documents, explain that document processing will be added in a future stage
+- For now, you don't have access to any documents (Stage 3: uploads only)
+- If asked about documents, explain that document processing will be added in future stages
+- You can acknowledge when users upload files, but can't read them yet
 
-CONTEXT: This is Stage 2 of a RAG (Retrieval-Augmented Generation) chat application. Document processing and search capabilities will be added in later stages.`,
+CONTEXT: This is Stage 3 of a RAG (Retrieval-Augmented Generation) chat application. Users can now upload documents, but document processing and search capabilities will be added in later stages.`,
 
     // 🔧 AI Configuration
     inferenceConfiguration: {
@@ -25,28 +26,31 @@ CONTEXT: This is Stage 2 of a RAG (Retrieval-Augmented Generation) chat applicat
   })
   .authorization((allow) => allow.owner()),
 
-  // 📄 Document Model (keeping from Stage 1)
+  // 📄 Document Model (enhanced for Stage 3)
   Document: a.model({
     name: a.string().required(),
     key: a.string().required(),
     size: a.integer(),
+    type: a.string(), // PDF, TXT, etc.
     uploadedAt: a.datetime(),
-    status: a.string().default('uploading'),
+    status: a.string().default('uploaded'),
+    processingStatus: a.string().default('pending'), // For future stages
     owner: a.string()
   })
   .authorization((allow) => allow.owner()),
 
-  // 👤 User Profile Model (keeping from Stage 1)
+  // 👤 User Profile Model (enhanced for Stage 3)
   UserProfile: a.model({
     email: a.string().required(),
     totalDocuments: a.integer().default(0),
+    storageUsed: a.integer().default(0), // In bytes
     lastActiveAt: a.datetime(),
     owner: a.string()
   })
   .authorization((allow) => allow.owner())
 });
 
-// 🎯 Export Schema Type - This is what was missing!
+// 🎯 Export Schema Type
 export type Schema = ClientSchema<typeof schema>;
 
 export const data = defineData({
@@ -56,4 +60,4 @@ export const data = defineData({
   }
 });
 
-console.log('📊 Stage 2: Data schema with AI conversation configured');
+console.log('📊 Stage 3: Data schema with AI conversation + storage configured');
