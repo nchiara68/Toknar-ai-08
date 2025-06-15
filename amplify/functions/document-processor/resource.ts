@@ -1,9 +1,9 @@
-import { defineFunction, NodeVersion } from '@aws-amplify/backend-function';
+import { defineFunction } from '@aws-amplify/backend';
 
 // 📄 STAGE 4: Document Processor Lambda with S3 Trigger Configuration
 export const documentProcessor = defineFunction({
   entry: './handler.ts',
-  runtime: NodeVersion.NODEJS_20, // ✅ Use enum, not string
+  
   timeoutSeconds: 300, // 5 minutes
   memoryMB: 1024,
   resourceGroupName: 'storage',
