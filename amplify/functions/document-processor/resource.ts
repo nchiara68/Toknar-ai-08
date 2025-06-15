@@ -1,11 +1,9 @@
 import { defineFunction } from '@aws-amplify/backend';
 
-// 📄 STAGE 4: Document Processor Lambda Function - FIXED CIRCULAR DEPENDENCY
 export const documentProcessor = defineFunction({
   entry: './handler.ts',
-  timeoutSeconds: 300, // 5 minutes for processing large documents
+  timeoutSeconds: 300,
   memoryMB: 1024,
-  // 🔑 CRITICAL: Assign to storage stack since function is triggered by S3
   resourceGroupName: 'storage'
 });
 
