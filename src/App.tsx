@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Amplify } from 'aws-amplify';
 import { Authenticator, useAuthenticator } from '@aws-amplify/ui-react';
 import { StorageManager } from '@aws-amplify/ui-react-storage';
@@ -11,7 +11,7 @@ import type { Schema } from '../amplify/data/resource';
 
 // 🔧 Configure Amplify
 Amplify.configure(outputs);
-console.log('🔧 Amplify configured for Stage 3: AI Conversation + File Upload');
+console.log('🔧 Amplify configured for Stage 4: AI Conversation + File Upload + Document Processing');
 
 // Generate client for database operations
 const client = generateClient<Schema>();
@@ -27,10 +27,10 @@ const components = {
         color: 'white'
       }}>
         <h1 style={{ margin: 0, fontSize: '1.8rem' }}>
-          📁 RAG Chat - Stage 3: File Upload
+          📄 RAG Chat - Stage 4: Document Processing
         </h1>
         <p style={{ margin: '0.5rem 0 0 0', opacity: 0.8 }}>
-          AI conversation + document uploads to S3
+          AI conversation + document uploads + text processing
         </p>
       </div>
     );
@@ -43,21 +43,69 @@ const components = {
         fontSize: '0.8rem',
         color: '#6C757D'
       }}>
-        📁 File uploads + 🤖 AI Conversation | Stage 3: Document Management
+        📄 Document Processing + 📁 File uploads + 🤖 AI Conversation | Stage 4: Text Chunking
       </div>
     );
   }
 };
 
-// 📄 Stage 3 Interface Component
-function Stage3Interface() {
-  console.log('📁 Stage 3: Interface component rendered');
-  
+// 📄 Type definitions
+interface UserProfileType {
+  id: string;
+  email: string;
+  totalDocuments: number;
+  totalChunks: number;
+  storageUsed: number;
+  lastActiveAt: string;
+  owner: string;
+}
+
+interface DocumentType {
+  id: string;
+  name: string;
+  key: string;
+  size: number;
+  type: string;
+  uploadedAt: string;
+  status: string;
+  processingStatus: string;
+  processedAt?: string;
+  totalChunks: number;
+  owner: string;
+}
+
+interface DocumentChunkType {
+  id: string;
+  documentId: string;
+  chunkIndex: number;
+  content: string;
+  wordCount: number;
+  startPosition: number;
+  endPosition: number;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+  owner: string;
+}
+
+interface UploadEvent {
+  key?: string;
+  result?: {
+    key?: string;
+    size?: number;
+  };
+  size?: number;
+}
+
+// 📄 Stage 4 Interface Component
+function Stage4Interface() {
   const { user, signOut } = useAuthenticator((context) => [context.user]);
   const [currentMessage, setCurrentMessage] = useState('');
-  const [activeTab, setActiveTab] = useState<'chat' | 'upload'>('chat');
-  const [uploadedFiles, setUploadedFiles] = useState<any[]>([]);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'chat' | 'upload' | 'documents'>('chat');
+  const [uploadedFiles, setUploadedFiles] = useState<DocumentType[]>([]);
+  const [userProfile, setUserProfile] = useState<UserProfileType | null>(null);
+  const [selectedDocument, setSelectedDocument] = useState<DocumentType | null>(null);
+  const [documentChunks, setDocumentChunks] = useState<DocumentChunkType[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0); // Force refresh trigger
   
   // 🤖 Use AI Conversation Hook
   const [
@@ -68,47 +116,208 @@ function Stage3Interface() {
     sendMessage,
   ] = useAIConversation('ragChat');
 
-  useEffect(() => {
-    console.log('🚀 Stage 3: Interface mounted');
-    console.log('👤 Current user:', user.signInDetails?.loginId);
-    loadUserProfile();
-    loadUploadedFiles();
-  }, [user]);
+  // 🔄 Force refresh function
+  const forceRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+  };
 
-  // 👤 Load user profile
-  const loadUserProfile = async () => {
+  // 🔍 Debug Stage 4 - Test database operations
+  const debugStage4 = async () => {
+    console.log('🔍 Starting Stage 4 Debug Tests...');
+    
     try {
-      const { data: profiles } = await client.models.UserProfile.list({
-        filter: { owner: { eq: user.username } } // Use username instead of userId
-      });
+      // Test 1: Check database connection
+      console.log('🔍 Test 1: Checking database connection...');
+      const { data: documents } = await client.models.Document.list();
+      console.log('✅ Database connection OK. Found', documents.length, 'documents');
       
-      if (profiles.length > 0) {
-        setUserProfile(profiles[0]);
-      } else {
-        // Create new profile
-        const newProfile = await client.models.UserProfile.create({
-          email: user.signInDetails?.loginId || '',
-          totalDocuments: 0,
-          storageUsed: 0,
-          lastActiveAt: new Date().toISOString(),
-          owner: user.username // Use username instead of userId
+      // Test 2: Check user profile
+      console.log('🔍 Test 2: Checking user profile...');
+      const { data: profiles } = await client.models.UserProfile.list();
+      console.log('✅ User profile check OK. Found', profiles.length, 'profiles');
+      
+      // Test 3: Check document chunks
+      console.log('🔍 Test 3: Checking document chunks...');
+      const { data: chunks } = await client.models.DocumentChunk.list();
+      console.log('✅ Document chunks check OK. Found', chunks.length, 'chunks');
+      
+      // Test 4: Create a test document record
+      console.log('🔍 Test 4: Creating test document record...');
+      const testDoc = await client.models.Document.create({
+        name: 'debug-test.txt',
+        key: 'documents/debug-test.txt',
+        size: 1000,
+        type: 'TXT',
+        uploadedAt: new Date().toISOString(),
+        status: 'uploaded',
+        processingStatus: 'pending',
+        owner: user.username
+      });
+      console.log('✅ Test document created:', testDoc.data?.id);
+      
+      // Test 5: Update the test document
+      console.log('🔍 Test 5: Updating test document...');
+      if (testDoc.data?.id) {
+        await client.models.Document.update({
+          id: testDoc.data.id,
+          processingStatus: 'completed',
+          totalChunks: 3
         });
-        setUserProfile(newProfile.data);
+        console.log('✅ Test document updated');
       }
+      
+      // Test 6: Create test chunks
+      console.log('🔍 Test 6: Creating test chunks...');
+      if (testDoc.data?.id) {
+        for (let i = 0; i < 3; i++) {
+          const chunk = await client.models.DocumentChunk.create({
+            documentId: testDoc.data.id,
+            chunkIndex: i,
+            content: `This is test chunk ${i + 1} for debugging purposes. Lorem ipsum dolor sit amet, consectetur adipiscing elit.`,
+            wordCount: 15,
+            startPosition: i * 100,
+            endPosition: (i + 1) * 100,
+            metadata: { test: true },
+            createdAt: new Date().toISOString(),
+            owner: user.username
+          });
+          console.log(`✅ Test chunk ${i + 1} created:`, chunk.data?.id);
+        }
+      }
+      
+      // Test 7: Query the test data
+      console.log('🔍 Test 7: Querying test data...');
+      const { data: updatedDocs } = await client.models.Document.list();
+      const { data: testChunks } = await client.models.DocumentChunk.list({
+        filter: { documentId: { eq: testDoc.data?.id } }
+      });
+      console.log('✅ Found', updatedDocs.length, 'documents and', testChunks.length, 'test chunks');
+      
+      // Test 8: Clean up test data
+      console.log('🔍 Test 8: Cleaning up test data...');
+      for (const chunk of testChunks) {
+        await client.models.DocumentChunk.delete({ id: chunk.id });
+      }
+      if (testDoc.data?.id) {
+        await client.models.Document.delete({ id: testDoc.data.id });
+      }
+      console.log('✅ Test cleanup complete');
+      
+      console.log('🎉 All Stage 4 Debug Tests PASSED!');
+      alert('🎉 All Stage 4 Debug Tests PASSED!\n\nYour database operations are working correctly.\nNow try uploading a real file to test the Lambda function.');
+      
     } catch (error) {
-      console.error('Error loading user profile:', error);
+      console.error('❌ Stage 4 Debug Test FAILED:', error);
+      alert(`❌ Stage 4 Debug Test FAILED:\n\n${error instanceof Error ? error.message : 'Unknown error'}\n\nCheck console for details.`);
     }
   };
 
-  // 📄 Load uploaded files
-  const loadUploadedFiles = async () => {
+  // 🎯 Initial load effect - define functions inside to avoid dependency issues
+  useEffect(() => {
+    console.log('🚀 Stage 4: Interface mounted for user:', user.signInDetails?.loginId);
+    
+    // Define functions inside useEffect to avoid dependency warnings
+    const loadProfile = async () => {
+      try {
+        const { data: profiles } = await client.models.UserProfile.list({
+          filter: { owner: { eq: user.username } }
+        });
+        
+        if (profiles.length > 0) {
+          setUserProfile(profiles[0] as UserProfileType);
+        } else {
+          const newProfile = await client.models.UserProfile.create({
+            email: user.signInDetails?.loginId || '',
+            totalDocuments: 0,
+            totalChunks: 0,
+            storageUsed: 0,
+            lastActiveAt: new Date().toISOString(),
+            owner: user.username
+          });
+          setUserProfile(newProfile.data as UserProfileType);
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+      }
+    };
+
+    const loadFiles = async () => {
+      try {
+        const { data: documents } = await client.models.Document.list({
+          filter: { owner: { eq: user.username } }
+        });
+        setUploadedFiles(documents as DocumentType[]);
+      } catch (error) {
+        console.error('Error loading uploaded files:', error);
+      }
+    };
+    
+    // Initialize data
+    const initializeData = async () => {
+      await loadProfile();
+      await loadFiles();
+    };
+    
+    initializeData();
+  }, [user.signInDetails?.loginId, user.username]); // Include all used dependencies
+
+  // 🔄 Auto-refresh effect
+  useEffect(() => {
+    const loadFiles = async () => {
+      try {
+        const { data: documents } = await client.models.Document.list({
+          filter: { owner: { eq: user.username } }
+        });
+        setUploadedFiles(documents as DocumentType[]);
+      } catch (error) {
+        console.error('Error loading uploaded files:', error);
+      }
+    };
+
+    const interval = setInterval(loadFiles, 10000);
+    return () => clearInterval(interval);
+  }, [user.username]); // Include username dependency
+
+  // 🔄 Manual refresh effect
+  useEffect(() => {
+    if (refreshKey > 0) {
+      const refreshData = async () => {
+        // Refresh profile
+        try {
+          const { data: profiles } = await client.models.UserProfile.list({
+            filter: { owner: { eq: user.username } }
+          });
+          if (profiles.length > 0) {
+            setUserProfile(profiles[0] as UserProfileType);
+          }
+        } catch (error) {
+          console.error('Error refreshing user profile:', error);
+        }
+
+        // Refresh files
+        try {
+          const { data: documents } = await client.models.Document.list({
+            filter: { owner: { eq: user.username } }
+          });
+          setUploadedFiles(documents as DocumentType[]);
+        } catch (error) {
+          console.error('Error refreshing uploaded files:', error);
+        }
+      };
+      
+      refreshData();
+    }
+  }, [refreshKey, user.username]); // Include all dependencies
+
+  // 📄 Load document chunks
+  const loadDocumentChunks = async (documentId: string) => {
     try {
-      const { data: documents } = await client.models.Document.list({
-        filter: { owner: { eq: user.username } } // Use username instead of userId
+      const { data: chunks } = await client.models.DocumentChunk.list({
+        filter: { documentId: { eq: documentId } }
       });
-      setUploadedFiles(documents);
+      setDocumentChunks(chunks.sort((a, b) => a.chunkIndex - b.chunkIndex) as DocumentChunkType[]);
     } catch (error) {
-      console.error('Error loading uploaded files:', error);
+      console.error('Error loading document chunks:', error);
     }
   };
 
@@ -129,10 +338,9 @@ function Stage3Interface() {
   };
 
   // 📁 Handle successful file upload
-  const handleUploadSuccess = async (event: any) => {
+  const handleUploadSuccess = async (event: UploadEvent) => {
     console.log('📁 File uploaded successfully:', event);
     console.log('📁 Event keys:', Object.keys(event));
-    console.log('📁 User info:', { userId: user.userId, username: user.username });
     
     try {
       // Handle different event structures
@@ -141,14 +349,6 @@ function Stage3Interface() {
       const fileExtension = fileName.split('.').pop()?.toUpperCase() || 'UNKNOWN';
       const fileSize = event.size || event.result?.size || 0;
       
-      console.log('📁 Creating document record with:', {
-        name: fileName,
-        key: fileKey,
-        size: fileSize,
-        type: fileExtension,
-        owner: user.username
-      });
-
       const docResult = await client.models.Document.create({
         name: fileName,
         key: fileKey,
@@ -162,52 +362,112 @@ function Stage3Interface() {
 
       console.log('📁 Document created successfully:', docResult);
 
-      // Update user profile
+      // Update user profile if it exists
       if (userProfile) {
-        const profileResult = await client.models.UserProfile.update({
+        await client.models.UserProfile.update({
           id: userProfile.id,
           totalDocuments: (userProfile.totalDocuments || 0) + 1,
           storageUsed: (userProfile.storageUsed || 0) + fileSize,
           lastActiveAt: new Date().toISOString()
         });
-        console.log('📁 Profile updated:', profileResult);
       }
 
-      // Reload data
-      await loadUserProfile();
-      await loadUploadedFiles();
+      // Force refresh
+      forceRefresh();
       
-      alert('✅ File uploaded successfully! Document processing will be added in Stage 4.');
-    } catch (error: any) {
+      alert('✅ File uploaded successfully! Processing will begin automatically.');
+    } catch (error) {
       console.error('Error creating document record:', error);
-      
-      // Better error logging
-      if (error instanceof Error) {
-        console.error('Error message:', error.message);
-        console.error('Error stack:', error.stack);
-      }
-      
-      // Try to extract GraphQL errors
-      if (error && typeof error === 'object' && 'errors' in error) {
-        console.error('GraphQL errors:', error.errors);
-      }
-      
       alert('File uploaded to S3 but failed to create database record. Check console for details.');
     }
   };
 
   // 🗑️ Handle file deletion
-  const handleDeleteFile = async (document: any) => {
-    if (!confirm(`Delete "${document.name}"?`)) return;
+  const handleDeleteFile = async (document: DocumentType) => {
+    if (!confirm(`Delete "${document.name}" and all its chunks?`)) return;
     
     try {
+      // Delete all chunks first
+      const { data: chunks } = await client.models.DocumentChunk.list({
+        filter: { documentId: { eq: document.id } }
+      });
+      
+      for (const chunk of chunks) {
+        await client.models.DocumentChunk.delete({ id: chunk.id });
+      }
+      
+      // Delete the document
       await client.models.Document.delete({ id: document.id });
-      loadUploadedFiles();
-      loadUserProfile();
-      alert('✅ File deleted successfully!');
+      
+      // Force refresh
+      forceRefresh();
+      
+      if (selectedDocument?.id === document.id) {
+        setSelectedDocument(null);
+        setDocumentChunks([]);
+      }
+      
+      alert('✅ Document and all chunks deleted successfully!');
     } catch (error) {
       console.error('Error deleting file:', error);
       alert('❌ Error deleting file.');
+    }
+  };
+
+  // 📄 View document details
+  const viewDocumentDetails = (document: DocumentType) => {
+    setSelectedDocument(document);
+    setActiveTab('documents');
+    if (document.processingStatus === 'completed') {
+      loadDocumentChunks(document.id);
+    }
+  };
+
+  // 🧹 TEMPORARY: Reset everything for fresh start
+  const resetEverything = async () => {
+    if (!confirm('⚠️ This will delete ALL documents and chunks. Continue?')) return;
+    
+    try {
+      console.log('🧹 Starting complete cleanup...');
+      
+      // Delete all chunks first (foreign key constraint)
+      const { data: allChunks } = await client.models.DocumentChunk.list();
+      console.log(`🧹 Deleting ${allChunks.length} chunks...`);
+      for (const chunk of allChunks) {
+        await client.models.DocumentChunk.delete({ id: chunk.id });
+      }
+      
+      // Delete all documents
+      const { data: allDocs } = await client.models.Document.list();
+      console.log(`🧹 Deleting ${allDocs.length} documents...`);
+      for (const doc of allDocs) {
+        await client.models.Document.delete({ id: doc.id });
+      }
+      
+      // Reset user profile counts
+      if (userProfile) {
+        await client.models.UserProfile.update({
+          id: userProfile.id,
+          totalDocuments: 0,
+          totalChunks: 0,
+          storageUsed: 0
+        });
+      }
+      
+      console.log('✅ Database cleanup complete!');
+      alert(`✅ Database cleaned! 
+      
+Next steps:
+1. Go to S3 console
+2. Delete all files in: documents/ folder
+3. Come back and start fresh testing!`);
+      
+      // Force refresh
+      forceRefresh();
+      
+    } catch (error) {
+      console.error('🧹 Cleanup error:', error);
+      alert('❌ Cleanup failed. Check console for details.');
     }
   };
 
@@ -216,6 +476,7 @@ function Stage3Interface() {
     const data = {
       profile: userProfile,
       documents: uploadedFiles,
+      chunks: documentChunks,
       messages: messages || [],
       exportedAt: new Date().toISOString()
     };
@@ -224,9 +485,29 @@ function Stage3Interface() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `rag-chat-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `rag-chat-export-stage4-${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  // 📊 Get processing status color
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed': return '#28A745';
+      case 'processing': return '#FFC107';
+      case 'failed': return '#DC3545';
+      default: return '#6C757D';
+    }
+  };
+
+  // 📊 Get processing status icon
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed': return '✅';
+      case 'processing': return '⚙️';
+      case 'failed': return '❌';
+      default: return '⏳';
+    }
   };
 
   return (
@@ -247,16 +528,62 @@ function Stage3Interface() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h1 style={{ margin: 0, fontSize: '1.5rem' }}>
-              📁 Stage 3: File Upload + AI Chat
+              📄 Stage 4: Document Processing
             </h1>
             <p style={{ margin: '0.5rem 0 0 0', fontSize: '0.9rem', opacity: 0.8 }}>
               👤 {user.signInDetails?.loginId} | 
               📄 {userProfile?.totalDocuments || 0} docs | 
+              🧩 {userProfile?.totalChunks || 0} chunks | 
               💬 {messages?.length || 0} messages
             </p>
           </div>
           
           <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              onClick={debugStage4}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#17A2B8',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.9rem'
+              }}
+            >
+              🔍 Debug DB
+            </button>
+            
+            <button
+              onClick={forceRefresh}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#6F42C1',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.9rem'
+              }}
+            >
+              🔄 Refresh
+            </button>
+            
+            <button
+              onClick={resetEverything}
+              style={{
+                padding: '0.5rem 1rem',
+                backgroundColor: '#DC3545',
+                color: 'white',
+                border: 'none',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.9rem'
+              }}
+            >
+              🧹 Reset All
+            </button>
+            
             <button
               onClick={exportData}
               style={{
@@ -318,6 +645,19 @@ function Stage3Interface() {
           >
             📁 Upload Files
           </button>
+          <button
+            onClick={() => setActiveTab('documents')}
+            style={{
+              padding: '0.5rem 1rem',
+              backgroundColor: activeTab === 'documents' ? '#FF9900' : 'transparent',
+              color: 'white',
+              border: '1px solid #FF9900',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            📄 Document Processing
+          </button>
         </div>
       </header>
 
@@ -342,7 +682,7 @@ function Stage3Interface() {
                 </span>
               </div>
               <div style={{ fontSize: '0.8rem', color: '#6C757D' }}>
-                🔄 Stage 3: Chat + file uploads (processing in Stage 4)
+                🔄 Stage 4: Chat + document processing (search in Stage 5)
               </div>
             </div>
 
@@ -359,16 +699,17 @@ function Stage3Interface() {
                   padding: '2rem',
                   color: '#6C757D'
                 }}>
-                  <h3>📁 Welcome to Stage 3, {user.signInDetails?.loginId?.split('@')[0]}!</h3>
-                  <p>I'm Claude 3 Haiku. You can now chat with me AND upload documents!</p>
-                  <p>Try uploading a PDF or TXT file using the "Upload Files" tab, then come back here to chat.</p>
-                  <p>Document processing will be added in Stage 4!</p>
+                  <h3>📄 Welcome to Stage 4, {user.signInDetails?.loginId?.split('@')[0]}!</h3>
+                  <p>I'm Claude 3 Haiku. You can now upload documents and watch them being processed into text chunks!</p>
+                  <p>🔍 <strong>First, click "Debug DB" to test database operations</strong></p>
+                  <p>Upload files in the "Upload Files" tab, then check "Document Processing" to see the results.</p>
+                  <p>Document search and retrieval will be added in Stage 5!</p>
                 </div>
               ) : (
                 <div>
-                  {messages.map((message, index) => (
+                  {messages.map((message, messageIndex) => (
                     <div
-                      key={index}
+                      key={messageIndex}
                       style={{
                         margin: '1rem 0',
                         padding: '1rem',
@@ -453,7 +794,6 @@ function Stage3Interface() {
 
         {activeTab === 'upload' && (
           <>
-            {/* Upload Interface */}
             <div style={{
               padding: '0.75rem 1rem',
               backgroundColor: '#F8F9FA',
@@ -465,7 +805,7 @@ function Stage3Interface() {
               <div>
                 <strong style={{ color: '#232F3E' }}>📁 Document Upload</strong>
                 <span style={{ marginLeft: '1rem', color: '#6C757D', fontSize: '0.9rem' }}>
-                  Upload PDF, TXT, DOC files
+                  Upload PDF, TXT, DOC files for processing
                 </span>
               </div>
               <div style={{ fontSize: '0.8rem', color: '#6C757D' }}>
@@ -474,7 +814,6 @@ function Stage3Interface() {
             </div>
 
             <div style={{ flex: 1, padding: '2rem', overflow: 'auto' }}>
-              {/* Storage Manager */}
               <div style={{ marginBottom: '2rem' }}>
                 <h3 style={{ marginBottom: '1rem' }}>📤 Upload New Documents</h3>
                 <StorageManager
@@ -488,6 +827,31 @@ function Stage3Interface() {
                     alert('❌ Upload failed. Please try again.');
                   }}
                 />
+              </div>
+
+              {/* Processing Status Overview */}
+              <div style={{ marginBottom: '2rem' }}>
+                <h3 style={{ marginBottom: '1rem' }}>📊 Processing Status Overview</h3>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1rem' }}>
+                  {['pending', 'processing', 'completed', 'failed'].map(status => {
+                    const count = uploadedFiles.filter(doc => doc.processingStatus === status).length;
+                    return (
+                      <div key={status} style={{
+                        padding: '1rem',
+                        backgroundColor: '#F8F9FA',
+                        borderRadius: '8px',
+                        textAlign: 'center',
+                        border: `2px solid ${getStatusColor(status)}`
+                      }}>
+                        <div style={{ fontSize: '1.5rem' }}>{getStatusIcon(status)}</div>
+                        <div style={{ fontWeight: 'bold', color: getStatusColor(status) }}>
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </div>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold' }}>{count}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Uploaded Files List */}
@@ -519,7 +883,7 @@ function Stage3Interface() {
                           alignItems: 'center'
                         }}
                       >
-                        <div>
+                        <div style={{ flex: 1 }}>
                           <div style={{ fontWeight: 'bold', color: '#232F3E' }}>
                             📄 {doc.name}
                           </div>
@@ -527,23 +891,46 @@ function Stage3Interface() {
                             {doc.type} • {Math.round(doc.size / 1024)} KB • 
                             {new Date(doc.uploadedAt).toLocaleDateString()}
                           </div>
-                          <div style={{ fontSize: '0.8rem', color: '#28A745', marginTop: '0.25rem' }}>
-                            Status: {doc.status} • Processing: {doc.processingStatus}
+                          <div style={{ 
+                            fontSize: '0.8rem', 
+                            color: getStatusColor(doc.processingStatus), 
+                            marginTop: '0.25rem',
+                            fontWeight: 'bold'
+                          }}>
+                            {getStatusIcon(doc.processingStatus)} Status: {doc.processingStatus}
+                            {doc.totalChunks > 0 && ` • ${doc.totalChunks} chunks`}
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleDeleteFile(doc)}
-                          style={{
-                            padding: '0.5rem',
-                            backgroundColor: '#DC3545',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '4px',
-                            cursor: 'pointer'
-                          }}
-                        >
-                          🗑️ Delete
-                        </button>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          {doc.processingStatus === 'completed' && (
+                            <button
+                              onClick={() => viewDocumentDetails(doc)}
+                              style={{
+                                padding: '0.5rem',
+                                backgroundColor: '#007BFF',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              📄 View
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleDeleteFile(doc)}
+                            style={{
+                              padding: '0.5rem',
+                              backgroundColor: '#DC3545',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '4px',
+                              cursor: 'pointer'
+                            }}
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -551,6 +938,37 @@ function Stage3Interface() {
               </div>
             </div>
           </>
+        )}
+
+        {activeTab === 'documents' && (
+          <div style={{ flex: 1, padding: '2rem', overflow: 'auto' }}>
+            <h3 style={{ marginBottom: '1rem' }}>📄 Document Processing Debug</h3>
+            <p style={{ color: '#6C757D', marginBottom: '2rem' }}>
+              1. Click "🔍 Debug DB" to test database operations<br/>
+              2. Upload a file to test Lambda processing<br/>
+              3. Watch status change: pending → processing → completed
+            </p>
+            
+            {uploadedFiles.length > 0 && (
+              <div>
+                <h4>Recent Documents:</h4>
+                {uploadedFiles.slice(0, 5).map(doc => (
+                  <div key={doc.id} style={{ 
+                    padding: '0.5rem', 
+                    border: '1px solid #DEE2E6', 
+                    margin: '0.5rem 0',
+                    borderRadius: '4px'
+                  }}>
+                    <strong>{doc.name}</strong> - 
+                    <span style={{ color: getStatusColor(doc.processingStatus), marginLeft: '0.5rem' }}>
+                      {getStatusIcon(doc.processingStatus)} {doc.processingStatus}
+                    </span>
+                    {doc.totalChunks > 0 && <span> ({doc.totalChunks} chunks)</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </main>
 
@@ -566,10 +984,10 @@ function Stage3Interface() {
         color: '#6C757D'
       }}>
         <div>
-          🚀 <strong>Next:</strong> Stage 4 - Document Processing
+          🚀 <strong>Next:</strong> Stage 5 - Embeddings + Vector Search
         </div>
         <div>
-          📁 Files: {uploadedFiles.length} | 💬 Messages: {messages?.length || 0}
+          📄 Files: {uploadedFiles.length} | 🧩 Chunks: {uploadedFiles.reduce((sum, doc) => sum + (doc.totalChunks || 0), 0)} | 💬 Messages: {messages?.length || 0}
         </div>
       </footer>
     </div>
@@ -578,8 +996,6 @@ function Stage3Interface() {
 
 // 📄 Main App Component
 function App() {
-  console.log('🚀 Stage 3: App component rendered');
-
   return (
     <div className="App">
       <Authenticator 
@@ -588,8 +1004,8 @@ function App() {
         loginMechanisms={['email']}
       >
         {({ user }) => {
-          console.log('✅ Stage 3: User authenticated:', user?.signInDetails?.loginId);
-          return <Stage3Interface />;
+          console.log('✅ Stage 4: User authenticated:', user?.signInDetails?.loginId);
+          return <Stage4Interface />;
         }}
       </Authenticator>
     </div>
@@ -598,4 +1014,4 @@ function App() {
 
 export default App;
 
-console.log('✅ Stage 3: File Upload + AI Conversation app loaded');
+console.log('✅ Stage 4: Document Processing app loaded');
