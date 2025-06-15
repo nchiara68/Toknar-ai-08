@@ -1,6 +1,6 @@
 import { defineData, a, type ClientSchema } from '@aws-amplify/backend';
 
-// 📊 STAGE 3: Data Schema with AI Conversation + Storage
+// 📊 STAGE 4: Complete Data Schema with Document Chunks
 const schema = a.schema({
   // 🤖 AI CONVERSATION (from Stage 2)
   ragChat: a.conversation({
@@ -11,11 +11,11 @@ INSTRUCTIONS:
 - Be friendly and conversational
 - Give clear, helpful responses
 - Keep responses concise but informative
-- For now, you don't have access to any documents (Stage 3: uploads only)
-- If asked about documents, explain that document processing will be added in future stages
-- You can acknowledge when users upload files, but can't read them yet
+- For now, you don't have access to any documents (Stage 4: processing only)
+- If asked about documents, explain that document processing is working but RAG integration comes in Stage 5
+- You can acknowledge when users upload files and see processing status
 
-CONTEXT: This is Stage 3 of a RAG (Retrieval-Augmented Generation) chat application. Users can now upload documents, but document processing and search capabilities will be added in later stages.`,
+CONTEXT: This is Stage 4 of a RAG (Retrieval-Augmented Generation) chat application. Users can upload documents that get processed into searchable chunks. RAG integration will be added in Stage 5.`,
 
     // 🔧 AI Configuration
     inferenceConfiguration: {
@@ -26,7 +26,7 @@ CONTEXT: This is Stage 3 of a RAG (Retrieval-Augmented Generation) chat applicat
   })
   .authorization((allow) => allow.owner()),
 
-  // 📄 Document Model (enhanced for Stage 3)
+  // 📄 Document Model
   Document: a.model({
     name: a.string().required(),
     key: a.string().required(),
@@ -34,15 +34,31 @@ CONTEXT: This is Stage 3 of a RAG (Retrieval-Augmented Generation) chat applicat
     type: a.string(), // PDF, TXT, etc.
     uploadedAt: a.datetime(),
     status: a.string().default('uploaded'),
-    processingStatus: a.string().default('pending'), // For future stages
+    processingStatus: a.string().default('pending'), // pending, processing, completed, failed
+    processedAt: a.datetime(),
+    totalChunks: a.integer().default(0),
     owner: a.string()
   })
   .authorization((allow) => allow.owner()),
 
-  // 👤 User Profile Model (enhanced for Stage 3)
+  // 🧩 NEW: Document Chunk Model for Stage 4
+  DocumentChunk: a.model({
+    documentId: a.string().required(),
+    chunkIndex: a.integer().required(),
+    content: a.string().required(),
+    wordCount: a.integer().required(),
+    startPosition: a.integer().required(),
+    endPosition: a.integer().required(),
+    metadata: a.json(), // For processing details
+    owner: a.string()
+  })
+  .authorization((allow) => allow.owner()),
+
+  // 👤 User Profile Model
   UserProfile: a.model({
     email: a.string().required(),
     totalDocuments: a.integer().default(0),
+    totalChunks: a.integer().default(0),
     storageUsed: a.integer().default(0), // In bytes
     lastActiveAt: a.datetime(),
     owner: a.string()
@@ -60,4 +76,4 @@ export const data = defineData({
   }
 });
 
-console.log('📊 Stage 3: Data schema with AI conversation + storage configured');
+console.log('📊 Stage 4: Complete data schema with DocumentChunk model configured');
