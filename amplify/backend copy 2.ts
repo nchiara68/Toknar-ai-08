@@ -3,16 +3,17 @@ import { auth } from './auth/resource';
 import { data } from './data/resource';
 import { storage } from './storage/resource';
 import { documentProcessor } from './functions/document-processor/resource';
+import { LambdaDestination } from 'aws-cdk-lib/aws-s3-notifications';
 
 // 🏗️ STAGE 4: Complete Backend with Lambda S3 Integration
 export const backend = defineBackend({
   auth,
   data,
   storage,
-  documentProcessor  // ← NEW: Adding the document processor function
+  documentProcessor
 });
 
-// 🗄️ STAGE 4: Grant Lambda access to DynamoDB tables - FIXED: Individual environment variables
+// 🗄️ STAGE 4: Grant Lambda access to DynamoDB tables
 backend.documentProcessor.addEnvironment(
   'DOCUMENT_TABLE', 
   backend.data.resources.tables['Document'].tableName
@@ -37,8 +38,12 @@ backend.storage.resources.bucket.grantRead(
   backend.documentProcessor.resources.lambda
 );
 
-console.log('🏗️ Stage 4: Complete backend with S3→Lambda→DynamoDB pipeline configured');
-console.log('📝 Note: S3 trigger will be added manually after deployment');
+// 🔗 STAGE 4: Add S3 Event Trigger
+// This creates the S3 trigger that will invoke Lambda when files are uploaded
+backend.storage.resources.bucket.addObjectCreatedNotification(
+  new LambdaDestination(backend.documentProcessor.resources.lambda),
+  { prefix: 'documents/' }
+);
 
-// 🎯 STAGE 4: Export backend for use in other parts of the application
-export const { documentProcessor: lambdaFunction } = backend;
+console.log('🏗️ Stage 4: Complete backend with S3→Lambda→DynamoDB pipeline configured');
+console.log('🔗 Stage 4: S3 trigger configured for documents/ prefix');

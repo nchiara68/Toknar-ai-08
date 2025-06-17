@@ -1,0 +1,17 @@
+
+{
+  "name": "embeddings-processor",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.432.0",
+    "@aws-sdk/lib-dynamodb": "^3.432.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.432.0",
+    "faiss-node": "^0.5.1",
+    "@types/aws-lambda": "^8.10.143"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.111"
+  }
+}
+
